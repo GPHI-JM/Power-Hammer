@@ -18,10 +18,10 @@ export function isValidPhilippineMobileNumber(value) {
 
 export function getPhoneVerificationConfig() {
   return {
-    endpoint: import.meta.env.VITE_VERIFY_PHONE_ENDPOINT || DEFAULT_VERIFY_PHONE_ENDPOINT,
-    gameId: import.meta.env.VITE_GAME_ID || DEFAULT_GAME_ID,
-    gameSecretKey: import.meta.env.VITE_GAME_SECRET_KEY || DEFAULT_GAME_SECRET_KEY,
-    gameIconPath: import.meta.env.VITE_GAME_ICON_PATH || DEFAULT_GAME_ICON_PATH,
+    endpoint: DEFAULT_VERIFY_PHONE_ENDPOINT,
+    gameId: DEFAULT_GAME_ID,
+    gameSecretKey: DEFAULT_GAME_SECRET_KEY,
+    gameIconPath: DEFAULT_GAME_ICON_PATH,
   }
 }
 

@@ -208,7 +208,7 @@ import {
   verifyPhoneWithAxios,
 } from '../services/phoneVerification'
 import nfIcon from '../assets/icons/nf_icon.png'
-import phIcon from '../assets/icons/ph_icon.png'
+import bfIcon from '../assets/icons/bf_icon.png'
 import tekhenIcon from '../assets/icons/tekhen_icon.png'
 
 const TEKHEN_SLASH_CYCLE_MS = 3000
@@ -421,10 +421,10 @@ const promoGames = [
     glow: 'rgba(57, 255, 20, 0.45)',
   },
   {
-    id: 'shabong',
-    name: 'Shabong',
-    iconSrc: phIcon,
-    url: 'https://bybet.ph/',
+    id: 'bingo-fiesta',
+    name: 'Bingo-Fiesta',
+    iconSrc: bfIcon,
+    url: 'https://fb.gg/play/1463506198613599',
     accent: '#ffe600',
     glow: 'rgba(255, 230, 0, 0.38)',
   },
