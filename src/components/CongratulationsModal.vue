@@ -22,15 +22,21 @@
 
           <div class="congratulations-modal__verify-form">
             <input
-              v-model="mobileNumber"
+              :value="mobileNumber"
               type="tel"
               inputmode="numeric"
+              pattern="[0-9]*"
+              autocomplete="tel-national"
               class="congratulations-modal__mobile-input"
               :class="{ 'congratulations-modal__mobile-input--error': errorMessage }"
-              placeholder="Enter mobile number"
-              maxlength="15"
-              @input="$emit('clear-error')"
+              placeholder="9XXXXXXXXX"
+              maxlength="10"
+              @input="onMobileInput"
+              @keydown="onMobileKeyDown"
             />
+            <p class="congratulations-modal__hint">
+              Philippine mobile numbers only, 10 digits and starts with 9.
+            </p>
             <p v-if="errorMessage" class="congratulations-modal__error">
               {{ errorMessage }}
             </p>
@@ -49,9 +55,10 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
+import { sanitizePhilippineMobileNumber } from '../services/phoneVerification'
 
-defineProps({
+const props = defineProps({
   show: { type: Boolean, default: false },
   errorMessage: { type: String, default: '' },
   variant: {
@@ -61,9 +68,48 @@ defineProps({
   },
 })
 
-defineEmits(['close', 'verify', 'clear-error'])
+const emit = defineEmits(['close', 'verify', 'clear-error'])
 
 const mobileNumber = ref('')
+
+function onMobileInput(event) {
+  mobileNumber.value = sanitizePhilippineMobileNumber(event.target.value)
+  emit('clear-error')
+}
+
+function onMobileKeyDown(event) {
+  const allowedControlKeys = [
+    'Backspace',
+    'Delete',
+    'Tab',
+    'ArrowLeft',
+    'ArrowRight',
+    'Home',
+    'End',
+    'Enter',
+  ]
+
+  if (allowedControlKeys.includes(event.key)) {
+    return
+  }
+
+  if (event.ctrlKey || event.metaKey || event.altKey) {
+    return
+  }
+
+  if (!/^\d$/.test(event.key)) {
+    event.preventDefault()
+  }
+}
+
+watch(
+  () => props.show,
+  (isVisible, wasVisible) => {
+    if (wasVisible && !isVisible) {
+      mobileNumber.value = ''
+    }
+  }
+)
 </script>
 
 <style scoped>
@@ -115,6 +161,12 @@ const mobileNumber = ref('')
   flex-direction: column;
   gap: 0.625rem;
   margin-bottom: 1rem;
+}
+
+.congratulations-modal__hint {
+  margin: -0.2rem 0 0;
+  font-size: 0.78rem;
+  color: rgba(255, 235, 59, 0.85);
 }
 
 .congratulations-modal__mobile-input {

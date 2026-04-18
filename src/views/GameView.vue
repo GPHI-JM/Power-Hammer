@@ -202,7 +202,11 @@ import {
   createPlaceholderLeaderboardEntries,
   fetchGameLeaderboardScores,
 } from '../services/gameScores'
-import { verifyPhoneWithAxios } from '../services/phoneVerification'
+import {
+  isValidPhilippineMobileNumber,
+  sanitizePhilippineMobileNumber,
+  verifyPhoneWithAxios,
+} from '../services/phoneVerification'
 import nfIcon from '../assets/icons/nf_icon.png'
 import phIcon from '../assets/icons/ph_icon.png'
 import tekhenIcon from '../assets/icons/tekhen_icon.png'
@@ -494,13 +498,19 @@ function onContinuePlay() {
 }
 
 async function onVerifyPhone(phone) {
-  const sanitizedPhone = String(phone ?? '').trim()
+  const sanitizedPhone = sanitizePhilippineMobileNumber(phone)
   if (isVerifyingPhone.value) return
 
   phoneVerificationError.value = ''
 
   if (!sanitizedPhone) {
     phoneVerificationError.value = 'Please enter your mobile number.'
+    return
+  }
+
+  if (!isValidPhilippineMobileNumber(sanitizedPhone)) {
+    phoneVerificationError.value =
+      'Enter a valid Philippine mobile number starting with 9.'
     return
   }
 
@@ -518,20 +528,46 @@ async function onVerifyPhone(phone) {
       return
     }
 
+    if (result?.errorCode === 'ERR_PHONE_ALREADY_USED') {
+      phoneVerificationError.value = 'Mobile Number Exist'
+      return
+    }
+
+    if (String(result?.message ?? '').toLowerCase().includes('already used')) {
+      phoneVerificationError.value = 'Mobile Number Exist'
+      return
+    }
+
     phoneVerificationError.value =
       result?.message ||
       result?.error ||
-      'This mobile number already exists.'
+      'Verification failed. Please try again.'
   } catch (error) {
     const responseMessage =
       error?.response?.data?.message ||
       error?.response?.data?.error ||
-      error?.message
+      error?.message ||
+      ''
 
-    phoneVerificationError.value =
-      responseMessage?.toLowerCase().includes('exist')
-        ? responseMessage
-        : 'This mobile number already exists.'
+    const responseErrorCode = error?.response?.data?.errorCode
+
+    if (
+      responseErrorCode === 'ERR_PHONE_ALREADY_USED' ||
+      responseMessage.toLowerCase().includes('already used')
+    ) {
+      phoneVerificationError.value = 'Mobile Number Exist'
+    } else if (
+      responseMessage.toLowerCase().includes('network error') ||
+      responseMessage.toLowerCase().includes('failed to fetch') ||
+      responseMessage.toLowerCase().includes('cors')
+    ) {
+      phoneVerificationError.value =
+        'Verification temporarily unavailable. Please try again.'
+    } else {
+      phoneVerificationError.value =
+        responseMessage || 'Verification failed. Please try again.'
+    }
+
     console.error('Phone verification failed.', error)
   } finally {
     isVerifyingPhone.value = false
