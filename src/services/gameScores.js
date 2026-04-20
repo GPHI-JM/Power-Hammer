@@ -12,44 +12,51 @@ const DEFAULT_SCORES_URL =
 export async function fetchGameLeaderboardScores() {
   const url = import.meta.env.VITE_GAME_SCORES_URL || DEFAULT_SCORES_URL
 
-  const response = await axios.get(url, {
-    timeout: DEFAULT_TIMEOUT_MS,
-    headers: {
-      Accept: 'application/json',
-    },
-  })
+  try {
+    const response = await axios.get(url, {
+      timeout: DEFAULT_TIMEOUT_MS,
+      headers: {
+        Accept: 'application/json',
+      },
+    })
 
-  const payload = response.data
-  let list = []
-  if (Array.isArray(payload)) {
-    list = payload
-  } else if (Array.isArray(payload?.scores)) {
-    list = payload.scores
-  } else if (Array.isArray(payload?.data)) {
-    list = payload.data
-  } else if (Array.isArray(payload?.results)) {
-    list = payload.results
-  } else {
+    const payload = response.data
+    let list = []
+    if (Array.isArray(payload)) {
+      list = payload
+    } else if (Array.isArray(payload?.scores)) {
+      list = payload.scores
+    } else if (Array.isArray(payload?.data)) {
+      list = payload.data
+    } else if (Array.isArray(payload?.results)) {
+      list = payload.results
+    } else {
+      return []
+    }
+
+    return list
+      .map((row, index) => {
+        const rawName =
+          row.name ??
+          row.player_name ??
+          row.username ??
+          row.nickname ??
+          row.display_name ??
+          `Player ${index + 1}`
+        const rawScore = row.score ?? row.points ?? row.value ?? row.total ?? 0
+        const numericScore = Number(rawScore)
+        return {
+          name: String(rawName).trim() || `Player ${index + 1}`,
+          score: Number.isFinite(numericScore) ? numericScore : 0,
+        }
+      })
+      .filter((row) => row.name.length > 0)
+  } catch (error) {
+    if (error?.response?.status !== 404) {
+      console.warn('Leaderboard fetch failed.', error)
+    }
     return []
   }
-
-  return list
-    .map((row, index) => {
-      const rawName =
-        row.name ??
-        row.player_name ??
-        row.username ??
-        row.nickname ??
-        row.display_name ??
-        `Player ${index + 1}`
-      const rawScore = row.score ?? row.points ?? row.value ?? row.total ?? 0
-      const numericScore = Number(rawScore)
-      return {
-        name: String(rawName).trim() || `Player ${index + 1}`,
-        score: Number.isFinite(numericScore) ? numericScore : 0,
-      }
-    })
-    .filter((row) => row.name.length > 0)
 }
 
 function randomMaskedPhoneDisplayName() {

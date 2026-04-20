@@ -66,14 +66,13 @@
     </aside>
 
     <aside class="game-view__promo-rail" aria-label="Other games">
-      <a
+      <button
         v-for="game in promoGames"
         :key="game.id"
-        :href="game.url"
-        target="_blank"
-        rel="noopener noreferrer"
+        type="button"
         :class="['promo-card', { 'promo-card--tekhen': game.id === 'tekhen' }]"
         :style="{ '--promo-accent': game.accent, '--promo-glow': game.glow }"
+        @click="onPromoGameClick($event, game)"
       >
         <span
           v-if="game.id !== 'tekhen'"
@@ -113,7 +112,7 @@
         >
         <span v-else class="promo-card__icon" aria-hidden="true">{{ game.icon }}</span>
         <span v-if="!game.iconSrc" class="promo-card__title">{{ game.name }}</span>
-      </a>
+      </button>
     </aside>
 
 
@@ -207,6 +206,11 @@ import {
   sanitizePhilippineMobileNumber,
   verifyPhoneWithAxios,
 } from '../services/phoneVerification'
+import {
+  isFBInstantEnabled,
+  isFBInstantReady,
+  whenFBInstantReady,
+} from '../services/fbInstant'
 import nfIcon from '../assets/icons/nf_icon.png'
 import bfIcon from '../assets/icons/bf_icon.png'
 import tekhenIcon from '../assets/icons/tekhen_icon.png'
@@ -220,12 +224,18 @@ let phaserResizeObserver = null
 let tekhenSlashTimeoutId = null
 let tekhenSlashIntervalId = null
 let playedSlashAfterFirstAudioGesture = false
+let audioUnlocked = false
 
 function unlockGameAudioFromUserGesture() {
   let shouldPlayImmediateSlash = false
   if (!playedSlashAfterFirstAudioGesture) {
     playedSlashAfterFirstAudioGesture = true
     shouldPlayImmediateSlash = true
+  }
+  if (!audioUnlocked) {
+    audioUnlocked = true
+    stopBackgroundAmbience = startBackgroundAmbience()
+    startTekhenSlashSoundLoop()
   }
   void resumeAllGameAudio().then(() => {
     if (shouldPlayImmediateSlash) {
@@ -254,10 +264,6 @@ function stopTekhenSlashSoundLoop() {
 }
 
 const powerMeterVertical = ref(false)
-
-function syncPowerMeterVerticalLayout() {
-  powerMeterVertical.value = window.matchMedia('(max-width: 900px)').matches
-}
 const isSwinging = ref(false)
 let swingTimeoutId = null
 const mouseX = ref(-500)
@@ -406,24 +412,27 @@ async function loadLeaderboardScores() {
 const promoGames = [
   {
     id: 'tekhen',
-    name: 'Tekhen',
+    name: 'Tek Hen',
     iconSrc: tekhenIcon,
-    url: 'https://bybet.ph/',
+    appId: '2136783867072234',
+    url: 'https://fb.gg/play/2136783867072234',
     accent: '#00e5ff',
     glow: 'rgba(0, 229, 255, 0.42)',
   },
   {
     id: 'net-flex',
-    name: 'Net-Flex',
+    name: 'Net Flex',
     iconSrc: nfIcon,
+    appId: '1431508008453701',
     url: 'https://fb.gg/play/1431508008453701',
     accent: '#39ff14',
     glow: 'rgba(57, 255, 20, 0.45)',
   },
   {
     id: 'bingo-fiesta',
-    name: 'Bingo-Fiesta',
+    name: 'Bingo Fiesta',
     iconSrc: bfIcon,
+    appId: '1463506198613599',
     url: 'https://fb.gg/play/1463506198613599',
     accent: '#ffe600',
     glow: 'rgba(255, 230, 0, 0.38)',
@@ -435,6 +444,50 @@ function onClosePhoneModal() {
   showExitPhoneModal.value = false
 }
 
+async function onPromoGameClick(event, game) {
+  if (!game?.appId) {
+    return
+  }
+
+  event.preventDefault()
+
+  if (isFBInstantEnabled() && window.FBInstant?.switchGameAsync) {
+    try {
+      if (!isFBInstantReady()) {
+        await whenFBInstantReady()
+      }
+
+      if (isFBInstantReady()) {
+        await window.FBInstant.switchGameAsync(String(game.appId))
+        return
+      }
+    } catch (error) {
+      if (game.url) {
+        try {
+          window.top.location.href = game.url
+        } catch {
+          window.location.href = game.url
+        }
+      }
+      return
+    }
+
+    if (game.url) {
+      try {
+        window.top.location.href = game.url
+      } catch {
+        window.location.href = game.url
+      }
+    }
+    return
+  }
+
+  if (game.url) {
+    window.open(game.url, '_blank', 'noopener,noreferrer')
+    return
+  }
+}
+
 function onGlobalScreenTap(event) {
   if (
     showCongratulations.value ||
@@ -444,7 +497,7 @@ function onGlobalScreenTap(event) {
     return
   }
   const target = event.target
-  if (target.closest('a.promo-card') || target.closest('a[href]')) {
+  if (target.closest('.promo-card') || target.closest('[data-game-ui]')) {
     return
   }
   const meterComponent = powerMeterRef.value
@@ -661,12 +714,7 @@ onMounted(() => {
   window.addEventListener('pointerdown', onPointerDown, { passive: true })
   window.addEventListener('touchstart', onTouchStartUnlock, { passive: true })
   window.addEventListener('keydown', onKeyDownUnlock, { passive: true })
-  syncPowerMeterVerticalLayout()
-  window.addEventListener('resize', syncPowerMeterVerticalLayout, { passive: true })
   document.documentElement.addEventListener('mouseleave', onDocumentMouseLeave)
-  stopBackgroundAmbience = startBackgroundAmbience()
-  void resumeAllGameAudio()
-  startTekhenSlashSoundLoop()
   void loadLeaderboardScores()
 })
 
@@ -679,7 +727,6 @@ onUnmounted(() => {
   window.clearTimeout(pageNinetyFxTimerId)
   showPageNinetyFx.value = false
   document.documentElement.removeEventListener('mouseleave', onDocumentMouseLeave)
-  window.removeEventListener('resize', syncPowerMeterVerticalLayout)
   if (phaserResizeObserver) {
     phaserResizeObserver.disconnect()
     phaserResizeObserver = null
@@ -1022,8 +1069,11 @@ onUnmounted(() => {
   justify-content: center;
   overflow: hidden;
   padding: 0;
-  text-decoration: none;
+  font: inherit;
   color: #fff;
+  text-align: left;
+  appearance: none;
+  -webkit-appearance: none;
   border: 1.5px solid var(--promo-accent);
   border-radius: 16px;
   background:
@@ -1035,9 +1085,21 @@ onUnmounted(() => {
     0 0 20px var(--promo-glow),
     0 0 36px color-mix(in srgb, var(--promo-accent) 38%, transparent);
   isolation: isolate;
+  cursor: pointer;
+  user-select: none;
+  touch-action: manipulation;
   transform: perspective(600px) rotateY(-8deg);
   transition: transform 0.18s ease, filter 0.18s ease, box-shadow 0.18s ease;
   animation: promoPulse 1.8s ease-in-out infinite alternate;
+}
+
+.promo-card::-moz-focus-inner {
+  border: 0;
+}
+
+.promo-card:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.85);
+  outline-offset: 2px;
 }
 
 .promo-card__image {
@@ -1590,9 +1652,9 @@ onUnmounted(() => {
 
 @media (max-width: 900px) {
   .game-view {
-    width: 100%;
-    min-height: 100%;
     min-height: 100dvh;
+    padding: clamp(0.3rem, 0.8vw, 0.45rem) clamp(0.45rem, 1vw, 0.7rem) clamp(0.55rem, 1.2vw, 0.8rem);
+    overflow: hidden;
   }
 
   .game-view__hammer-cursor {
@@ -1603,131 +1665,58 @@ onUnmounted(() => {
   }
 
   .game-view__header {
-    padding-top: max(0.45rem, env(safe-area-inset-top, 0px));
-    padding-left: max(0.65rem, env(safe-area-inset-left, 0px));
-    padding-right: max(0.65rem, env(safe-area-inset-right, 0px));
+    padding: clamp(0.3rem, 0.75vw, 0.42rem) clamp(0.55rem, 1vw, 0.72rem) clamp(0.18rem, 0.45vw, 0.24rem);
   }
 
   .game-view__title {
-    font-size: 1.1rem;
+    font-size: 0.98rem;
   }
 
   .game-view__score {
-    font-size: 0.72rem;
+    font-size: 0.62rem;
+    line-height: 1.1;
   }
 
   .game-view__score span + span {
-    margin-left: 0.65rem;
+    margin-left: 0.45rem;
   }
 
   .game-view__total-score--header-mobile {
     display: inline;
-    margin-left: 0.65rem;
+    margin-left: 0.45rem;
     font-weight: 700;
     color: var(--neon-yellow);
   }
 
+  .game-view__leaderboard {
+    top: clamp(3.2rem, 6.2vh, 3.8rem);
+    width: clamp(10.8rem, 61vw, 12rem);
+  }
+
   .game-view__machine {
-    position: absolute;
-    inset: 0;
-    flex: none;
-    width: auto;
-    height: auto;
-    padding: 0;
-    background: rgba(0, 0, 0, 0.7);
+    width: min(100%, 360px);
+    margin: clamp(2.55rem, 6.5vh, 3rem) auto 0;
+    background: rgba(0, 0, 0, 0.72);
   }
 
   .game-view__phaser {
-    position: absolute;
-    inset: 0;
     width: 100%;
-    height: 100%;
-    max-width: none;
-    max-height: none;
-    min-height: 0;
-    aspect-ratio: unset;
-    border-radius: 0;
-  }
-
-  .game-view__power-meter {
-    position: fixed;
-    left: max(0.65rem, env(safe-area-inset-left, 0px));
-    top: 50%;
-    right: auto;
-    transform: translateY(-50%);
-    z-index: 7;
-    margin: 0;
-  }
-
-  .game-view__leaderboard {
-    display: none;
+    max-width: 360px;
+    aspect-ratio: 420 / 560;
+    border-radius: 11px;
   }
 
   .game-view__promo-rail {
-    z-index: 6;
-    top: 50%;
-    right: max(0.65rem, env(safe-area-inset-right, 0px));
-    left: auto;
-    bottom: auto;
-    transform: translateY(-50%);
-    width: min(104px, 28vw);
-    flex-direction: column;
-    flex-wrap: nowrap;
-    align-items: stretch;
-    justify-content: flex-start;
-    gap: 0.65rem;
-    overflow: visible;
-    padding-bottom: 0;
-  }
-
-  .game-view__bottom-bar {
-    left: max(0.5rem, env(safe-area-inset-left, 0px));
-    right: max(0.5rem, env(safe-area-inset-right, 0px));
-    width: auto;
-    transform: none;
-    bottom: max(0.65rem, env(safe-area-inset-bottom, 0px));
-    gap: 0.5rem;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .game-view__smash-limit {
-    padding: 0.5rem 0.55rem;
-    gap: 0.3rem;
-  }
-
-  .smash-limit__label {
-    font-size: 0.58rem;
+    top: clamp(3.05rem, 6.8vh, 3.75rem);
+    right: clamp(0.28rem, 0.9vw, 0.6rem);
+    width: clamp(4.25rem, 14vw, 4.85rem);
+    gap: clamp(0.3rem, 0.8vw, 0.42rem);
   }
 
   .promo-card {
-    min-width: 0;
-    width: 100%;
-    min-height: 76px;
-    border-width: 2.5px;
-    border-radius: 14px;
-    transform: none;
-    -webkit-tap-highlight-color: rgba(255, 255, 255, 0.12);
-    touch-action: manipulation;
-    cursor: pointer;
-    animation: promoMobileGlow 1.15s ease-in-out infinite alternate;
-    box-shadow:
-      0 0 0 2px rgba(255, 255, 255, 0.22) inset,
-      0 4px 18px rgba(0, 0, 0, 0.45),
-      0 0 28px var(--promo-glow),
-      0 0 52px color-mix(in srgb, var(--promo-accent) 55%, transparent);
-  }
-
-  .promo-card:nth-child(1) {
-    animation-delay: 0s;
-  }
-
-  .promo-card:nth-child(2) {
-    animation-delay: 0.18s;
-  }
-
-  .promo-card:nth-child(3) {
-    animation-delay: 0.36s;
+    min-height: clamp(72px, 14.5vw, 80px);
+    border-radius: 12px;
+    border-width: 1.5px;
   }
 
   .promo-card__badge {
@@ -1735,78 +1724,34 @@ onUnmounted(() => {
     right: 0.25rem;
     font-size: 0.52rem;
     padding: 0.14rem 0.36rem;
-    animation: promoBadgePulse 1.4s ease-in-out infinite;
-    box-shadow:
-      0 0 14px rgba(255, 45, 146, 0.95),
-      0 0 24px rgba(255, 45, 146, 0.55);
-  }
-
-  .promo-card:hover {
-    transform: translateY(-3px) scale(1.05);
-    filter: brightness(1.12) saturate(1.15);
-  }
-
-  .promo-card:active {
-    transform: scale(0.97);
-    filter: brightness(1.05);
-  }
-}
-
-@keyframes promoMobileGlow {
-  from {
-    box-shadow:
-      0 0 0 2px rgba(255, 255, 255, 0.18) inset,
-      0 3px 14px rgba(0, 0, 0, 0.4),
-      0 0 22px var(--promo-glow),
-      0 0 40px color-mix(in srgb, var(--promo-accent) 45%, transparent);
-    transform: scale(1);
-  }
-  to {
-    box-shadow:
-      0 0 0 3px rgba(255, 255, 255, 0.32) inset,
-      0 6px 22px rgba(0, 0, 0, 0.5),
-      0 0 38px var(--promo-glow),
-      0 0 68px color-mix(in srgb, var(--promo-accent) 72%, transparent);
-    transform: scale(1.045);
-  }
-}
-
-@keyframes promoBadgePulse {
-  0%,
-  100% {
-    transform: scale(1);
-    opacity: 1;
-  }
-  50% {
-    transform: scale(1.08);
-    opacity: 1;
-  }
-}
-
-@media (max-width: 480px) {
-  .game-view__score span + span {
-    display: block;
-    margin-left: 0;
-    margin-top: 0.15rem;
   }
 
   .game-view__bottom-bar {
-    flex-direction: column-reverse;
-    align-items: stretch;
-    justify-content: center;
-    gap: 0.45rem;
+    left: 50%;
+    right: auto;
+    bottom: clamp(0.38rem, 1vh, 0.62rem);
+    width: min(calc(100% - clamp(0.7rem, 1.6vw, 1rem)), 521px);
+    max-width: 521px;
+    transform: translateX(-50%);
+    gap: clamp(0.35rem, 0.8vw, 0.55rem);
   }
 
   .game-view__smash-limit {
-    flex-direction: row;
-    flex-wrap: wrap;
-    justify-content: center;
-    align-items: center;
-    gap: 0.5rem;
+    padding: clamp(0.42rem, 0.95vw, 0.55rem);
+    gap: clamp(0.22rem, 0.55vw, 0.3rem);
   }
 
-  .smash-limit__pips {
-    flex-direction: row;
+  .smash-limit__label {
+    font-size: 0.54rem;
+  }
+
+  .smash-limit__pip {
+    width: 15px;
+    height: 15px;
+  }
+
+  .smash-limit__count {
+    font-size: 0.6rem;
   }
 }
 
