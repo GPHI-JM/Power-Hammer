@@ -206,11 +206,6 @@ import {
   sanitizePhilippineMobileNumber,
   verifyPhoneWithAxios,
 } from '../services/phoneVerification'
-import {
-  isFBInstantEnabled,
-  isFBInstantReady,
-  whenFBInstantReady,
-} from '../services/fbInstant'
 import nfIcon from '../assets/icons/nf_icon.png'
 import bfIcon from '../assets/icons/bf_icon.png'
 import tekhenIcon from '../assets/icons/tekhen_icon.png'
@@ -414,7 +409,6 @@ const promoGames = [
     id: 'tekhen',
     name: 'Tek Hen',
     iconSrc: tekhenIcon,
-    appId: '2136783867072234',
     url: 'https://fb.gg/play/2136783867072234',
     accent: '#00e5ff',
     glow: 'rgba(0, 229, 255, 0.42)',
@@ -423,7 +417,6 @@ const promoGames = [
     id: 'net-flex',
     name: 'Net Flex',
     iconSrc: nfIcon,
-    appId: '1431508008453701',
     url: 'https://fb.gg/play/1431508008453701',
     accent: '#39ff14',
     glow: 'rgba(57, 255, 20, 0.45)',
@@ -432,7 +425,6 @@ const promoGames = [
     id: 'bingo-fiesta',
     name: 'Bingo Fiesta',
     iconSrc: bfIcon,
-    appId: '1463506198613599',
     url: 'https://fb.gg/play/1463506198613599',
     accent: '#ffe600',
     glow: 'rgba(255, 230, 0, 0.38)',
@@ -445,47 +437,13 @@ function onClosePhoneModal() {
 }
 
 async function onPromoGameClick(event, game) {
-  if (!game?.appId) {
+  if (!game?.url) {
     return
   }
 
   event.preventDefault()
 
-  if (isFBInstantEnabled() && window.FBInstant?.switchGameAsync) {
-    try {
-      if (!isFBInstantReady()) {
-        await whenFBInstantReady()
-      }
-
-      if (isFBInstantReady()) {
-        await window.FBInstant.switchGameAsync(String(game.appId))
-        return
-      }
-    } catch (error) {
-      if (game.url) {
-        try {
-          window.top.location.href = game.url
-        } catch {
-          window.location.href = game.url
-        }
-      }
-      return
-    }
-
-    if (game.url) {
-      try {
-        window.top.location.href = game.url
-      } catch {
-        window.location.href = game.url
-      }
-    }
-    return
-  }
-
-  if (game.url) {
-    window.open(game.url, '_blank', 'noopener,noreferrer')
-    return
-  }
+  window.open(game.url, '_blank', 'noopener,noreferrer')
 }
 
 function onGlobalScreenTap(event) {

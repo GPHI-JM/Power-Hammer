@@ -21,11 +21,6 @@ export default class MainScene extends Scene {
   }
 
   preload() {
-    this.load.on('progress', (value) => {
-      if (window.FBInstant?.setLoadingProgress) {
-        window.FBInstant.setLoadingProgress(Math.floor(value * 100))
-      }
-    })
     this.load.image('puck', './puck.png')
   }
 
