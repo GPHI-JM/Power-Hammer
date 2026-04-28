@@ -199,7 +199,7 @@ import {
 import { formatScoreCompact, impactStrengthToPowerPoints } from '../utils/scorePower'
 import {
   createPlaceholderLeaderboardEntries,
-  fetchGameLeaderboardScores,
+  fetchPhoneLeaderboardEntries,
 } from '../services/gameScores'
 import {
   isValidPhilippineMobileNumber,
@@ -317,31 +317,17 @@ const formattedLastStrike = computed(() =>
 )
 
 const leaderboardEntries = computed(() => {
-  const others = externalLeaderboardPlayers.value.filter(
-    (entry) => entry.name !== 'You'
-  )
-  const rows = [
-    ...others.map((entry) => ({
-      name: entry.name,
-      numericScore: entry.score,
-      displayScore: formatScoreCompact(entry.score),
-    })),
-    {
-      name: 'You',
-      numericScore: totalScore.value,
-      displayScore: formattedDisplayTotal.value,
-    },
-  ]
-  rows.sort((rowA, rowB) => {
-    if (rowB.numericScore !== rowA.numericScore) {
-      return rowB.numericScore - rowA.numericScore
+  const rows = [...externalLeaderboardPlayers.value].sort((rowA, rowB) => {
+    if (rowB.score !== rowA.score) {
+      return rowB.score - rowA.score
     }
     return rowA.name.localeCompare(rowB.name)
   })
+
   return rows.map((row, index) => ({
     rank: index + 1,
     name: row.name,
-    score: row.displayScore,
+    score: formatScoreCompact(row.score),
   }))
 })
 
@@ -392,15 +378,12 @@ function isPerfectStrike(impactStrength, strikePoints) {
 
 async function loadLeaderboardScores() {
   try {
-    const rows = await fetchGameLeaderboardScores()
-    const filtered = rows.filter((entry) => entry.name !== 'You')
+    const rows = await fetchPhoneLeaderboardEntries()
     externalLeaderboardPlayers.value =
-      filtered.length > 0
-        ? filtered
-        : createPlaceholderLeaderboardEntries(2)
+      rows.length > 0 ? rows : createPlaceholderLeaderboardEntries(3)
   } catch (error) {
     console.warn('Leaderboard fetch failed.', error)
-    externalLeaderboardPlayers.value = createPlaceholderLeaderboardEntries(2)
+    externalLeaderboardPlayers.value = createPlaceholderLeaderboardEntries(3)
   }
 }
 
@@ -408,6 +391,7 @@ const promoGames = [
   {
     id: 'tekhen',
     name: 'Tek Hen',
+    appId: '2136783867072234',
     iconSrc: tekhenIcon,
     url: 'https://fb.gg/play/2136783867072234',
     accent: '#00e5ff',
@@ -416,6 +400,7 @@ const promoGames = [
   {
     id: 'net-flex',
     name: 'Net Flex',
+    appId: '1431508008453701',
     iconSrc: nfIcon,
     url: 'https://fb.gg/play/1431508008453701',
     accent: '#39ff14',
@@ -424,6 +409,7 @@ const promoGames = [
   {
     id: 'bingo-fiesta',
     name: 'Bingo Fiesta',
+    appId: '1463506198613599',
     iconSrc: bfIcon,
     url: 'https://fb.gg/play/1463506198613599',
     accent: '#ffe600',
@@ -437,13 +423,24 @@ function onClosePhoneModal() {
 }
 
 async function onPromoGameClick(event, game) {
-  if (!game?.url) {
+  if (!game?.appId && !game?.url) {
     return
   }
 
   event.preventDefault()
 
-  window.open(game.url, '_blank', 'noopener,noreferrer')
+  if (window.FBInstant?.switchGameAsync && game.appId) {
+    try {
+      await window.FBInstant.switchGameAsync(String(game.appId))
+      return
+    } catch (error) {
+      console.warn('FBInstant switchGameAsync failed.', error)
+    }
+  }
+
+  if (game.url) {
+    window.open(game.url, '_blank', 'noopener,noreferrer')
+  }
 }
 
 function onGlobalScreenTap(event) {

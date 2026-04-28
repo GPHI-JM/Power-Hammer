@@ -4,7 +4,7 @@
     <ul class="leaderboard__list">
       <li
         v-for="entry in entries"
-        :key="entry.name"
+        :key="entry.rank"
         class="leaderboard__item"
         :class="{ 'leaderboard__item--you': entry.name === 'You' }"
       >
