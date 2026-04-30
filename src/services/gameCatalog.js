@@ -2,9 +2,9 @@ import axios from 'axios'
 
 const DEFAULT_TIMEOUT_MS = 10000
 const DEFAULT_GAMES_URL =
-  'https://docking-635955947416.asia-east1.run.app/api/games?featured_limit=3&new_limit=3'
-const DEFAULT_GAMES_FALLBACK_URL =
   'https://docking-635955947416.asia-east1.run.app/api/games/'
+const DEFAULT_GAMES_FALLBACK_URL =
+  'https://docking-635955947416.asia-east1.run.app/api/games?featured_limit=3&new_limit=3'
 export const CURRENT_GAME_NAME = 'Power Hammer'
 const DEFAULT_CURRENT_GAME_ALIASES = [
   'Power Hammer',
@@ -158,4 +158,39 @@ export async function getCurrentGameLoginGameId(
   const rawGameId = match.game_id ?? match.id
   const resolvedGameId = String(rawGameId ?? '').trim()
   return resolvedGameId || null
+}
+
+export async function getGamesCatalog() {
+  return loadGames()
+}
+
+export async function getAvailableGamesForRail(gameName = CURRENT_GAME_NAME) {
+  const [games, currentGameId] = await Promise.all([
+    getGamesCatalog(),
+    getCurrentGameLoginGameId(gameName),
+  ])
+
+  const normalizedGameName = normalizeName(gameName)
+  const normalizedGameSlug = toSlug(gameName)
+
+  return games.filter((game) => {
+    const gameId = String(game?.game_id ?? game?.id ?? '').trim()
+    const gameNameNormalized = normalizeName(game?.name)
+    const gameSlugNormalized = normalizeName(game?.slug)
+    const gameSlugFromName = toSlug(game?.name)
+
+    if (!gameId) {
+      return false
+    }
+
+    if (gameId === String(currentGameId ?? '').trim()) {
+      return false
+    }
+
+    return !(
+      gameNameNormalized === normalizedGameName ||
+      gameSlugNormalized === normalizedGameSlug ||
+      gameSlugFromName === normalizedGameSlug
+    )
+  })
 }

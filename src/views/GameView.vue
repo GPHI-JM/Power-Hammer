@@ -70,17 +70,17 @@
         v-for="game in promoGames"
         :key="game.id"
         type="button"
-        :class="['promo-card', { 'promo-card--tekhen': game.id === 'tekhen' }]"
+        :class="['promo-card', { 'promo-card--tekhen': game.isTekhen }]"
         :style="{ '--promo-accent': game.accent, '--promo-glow': game.glow }"
         @click="onPromoGameClick($event, game)"
       >
         <span
-          v-if="game.id !== 'tekhen'"
+          v-if="!game.isTekhen"
           class="promo-card__shine"
           aria-hidden="true"
         />
         <span class="promo-card__badge">Hot</span>
-        <template v-if="game.id === 'tekhen' && game.iconSrc">
+        <template v-if="game.isTekhen && game.iconSrc">
           <div class="promo-card__tekhen-stack">
             <img
               class="promo-card__image promo-card__image--tekhen-left"
@@ -202,6 +202,10 @@ import {
   fetchPhoneLeaderboardEntries,
 } from '../services/gameScores'
 import {
+  CURRENT_GAME_NAME,
+  getAvailableGamesForRail,
+} from '../services/gameCatalog'
+import {
   isValidPhilippineMobileNumber,
   sanitizePhilippineMobileNumber,
   verifyPhoneWithAxios,
@@ -310,6 +314,35 @@ const smashesLeft = ref(MAX_SMASHES)
 let stopBackgroundAmbience = null
 let scoreAnimationFrameId = null
 const externalLeaderboardPlayers = ref([])
+const promoGames = ref([
+  {
+    id: 'tekhen',
+    name: 'Tek Hen',
+    appId: '2136783867072234',
+    iconSrc: tekhenIcon,
+    url: 'https://fb.gg/play/2136783867072234',
+    accent: '#00e5ff',
+    glow: 'rgba(0, 229, 255, 0.42)',
+  },
+  {
+    id: 'net-flex',
+    name: 'Net Flex',
+    appId: '1431508008453701',
+    iconSrc: nfIcon,
+    url: 'https://fb.gg/play/1431508008453701',
+    accent: '#39ff14',
+    glow: 'rgba(57, 255, 20, 0.45)',
+  },
+  {
+    id: 'bingo-fiesta',
+    name: 'Bingo Fiesta',
+    appId: '1463506198613599',
+    iconSrc: bfIcon,
+    url: 'https://fb.gg/play/1463506198613599',
+    accent: '#ffe600',
+    glow: 'rgba(255, 230, 0, 0.38)',
+  },
+])
 const formattedDisplayTotal = computed(() => formatScoreCompact(displayedScore.value))
 
 const formattedLastStrike = computed(() =>
@@ -387,35 +420,99 @@ async function loadLeaderboardScores() {
   }
 }
 
-const promoGames = [
-  {
-    id: 'tekhen',
-    name: 'Tek Hen',
-    appId: '2136783867072234',
+const PROMO_GAME_FALLBACKS = {
+  'tek-hen': {
     iconSrc: tekhenIcon,
-    url: 'https://fb.gg/play/2136783867072234',
     accent: '#00e5ff',
     glow: 'rgba(0, 229, 255, 0.42)',
   },
-  {
-    id: 'net-flex',
-    name: 'Net Flex',
-    appId: '1431508008453701',
+  'net-flex': {
     iconSrc: nfIcon,
-    url: 'https://fb.gg/play/1431508008453701',
     accent: '#39ff14',
     glow: 'rgba(57, 255, 20, 0.45)',
   },
-  {
-    id: 'bingo-fiesta',
-    name: 'Bingo Fiesta',
-    appId: '1463506198613599',
+  'bingo-fiesta': {
     iconSrc: bfIcon,
-    url: 'https://fb.gg/play/1463506198613599',
     accent: '#ffe600',
     glow: 'rgba(255, 230, 0, 0.38)',
   },
-]
+}
+
+function normalizePromoGameSlug(value) {
+  return String(value ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+}
+
+function getPromoGameFallback(slug) {
+  return PROMO_GAME_FALLBACKS[slug] || {}
+}
+
+function createPromoGameCard(game, index = 0) {
+  const slug = normalizePromoGameSlug(game?.slug ?? game?.name ?? game?.game_id ?? index)
+  const fallback = getPromoGameFallback(slug)
+  const resolvedId = String(game?.game_id ?? game?.id ?? slug ?? index).trim() || `promo-${index}`
+
+  return {
+    id: resolvedId,
+    slug,
+    name: String(game?.name ?? `Game ${index + 1}`).trim() || `Game ${index + 1}`,
+    iconSrc: String(game?.image_url ?? fallback.iconSrc ?? '').trim(),
+    href: String(game?.game_url ?? '').trim(),
+    accent: String(fallback.accent ?? '#00e5ff'),
+    glow: String(fallback.glow ?? 'rgba(0, 229, 255, 0.36)'),
+    icon: String(game?.name ?? slug ?? 'g').trim().slice(0, 2).toUpperCase() || 'G',
+    isTekhen: slug === 'tek-hen',
+  }
+}
+
+function createFallbackPromoGames() {
+  return [
+    createPromoGameCard(
+      {
+        game_id: 2,
+        slug: 'tek-hen',
+        name: 'Tek Hen',
+        image_url: tekhenIcon,
+        game_url: 'https://fb.gg/play/2136783867072234',
+      },
+      0
+    ),
+    createPromoGameCard(
+      {
+        game_id: 4,
+        slug: 'net-flex',
+        name: 'Net Flex',
+        image_url: nfIcon,
+        game_url: 'https://fb.gg/play/1431508008453701',
+      },
+      1
+    ),
+    createPromoGameCard(
+      {
+        game_id: 6,
+        slug: 'bingo-fiesta',
+        name: 'Bingo Fiesta',
+        image_url: bfIcon,
+        game_url: 'https://fb.gg/play/1463506198613599',
+      },
+      2
+    ),
+  ]
+}
+
+async function loadPromoGames() {
+  try {
+    const games = await getAvailableGamesForRail(CURRENT_GAME_NAME)
+    const cards = games.map((game, index) => createPromoGameCard(game, index))
+    promoGames.value = cards.length > 0 ? cards : createFallbackPromoGames()
+  } catch (error) {
+    console.warn('Promo games fetch failed.', error)
+    promoGames.value = createFallbackPromoGames()
+  }
+}
 
 function onClosePhoneModal() {
   showCongratulations.value = false
@@ -423,23 +520,14 @@ function onClosePhoneModal() {
 }
 
 async function onPromoGameClick(event, game) {
-  if (!game?.appId && !game?.url) {
+  if (!game?.href) {
     return
   }
 
   event.preventDefault()
 
-  if (window.FBInstant?.switchGameAsync && game.appId) {
-    try {
-      await window.FBInstant.switchGameAsync(String(game.appId))
-      return
-    } catch (error) {
-      console.warn('FBInstant switchGameAsync failed.', error)
-    }
-  }
-
-  if (game.url) {
-    window.open(game.url, '_blank', 'noopener,noreferrer')
+  if (game.href) {
+    window.open(game.href, '_blank', 'noopener,noreferrer')
   }
 }
 
@@ -670,6 +758,7 @@ onMounted(() => {
   window.addEventListener('touchstart', onTouchStartUnlock, { passive: true })
   window.addEventListener('keydown', onKeyDownUnlock, { passive: true })
   document.documentElement.addEventListener('mouseleave', onDocumentMouseLeave)
+  void loadPromoGames()
   void loadLeaderboardScores()
 })
 

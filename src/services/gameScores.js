@@ -14,6 +14,30 @@ function extractRows(payload) {
     return payload.data
   }
 
+  if (Array.isArray(payload?.data?.top_scorers)) {
+    return payload.data.top_scorers
+  }
+
+  if (Array.isArray(payload?.data?.scorers)) {
+    return payload.data.scorers
+  }
+
+  if (Array.isArray(payload?.data?.leaderboard)) {
+    return payload.data.leaderboard
+  }
+
+  if (Array.isArray(payload?.top_scorers)) {
+    return payload.top_scorers
+  }
+
+  if (Array.isArray(payload?.scorers)) {
+    return payload.scorers
+  }
+
+  if (Array.isArray(payload?.leaderboard)) {
+    return payload.leaderboard
+  }
+
   if (Array.isArray(payload?.data?.rows)) {
     return payload.data.rows
   }
